@@ -1,7 +1,22 @@
-use ggez::{conf, event, graphics::{self, DrawParam, Image}, Context, GameResult};
+use ggez::{conf, event::{self, KeyCode, KeyMods}, graphics::{self, DrawParam, Image}, Context, GameResult};
 use glam::Vec2;
-use specs::{storage, Builder, Component, Join, ReadStorage, RunNow, System, VecStorage, World, WorldExt};
-use std::{path};
+use specs::{storage::{self, GenericWriteStorage}, world::Index, Builder, Component, Entities, Join, NullStorage, ReadStorage, RunNow, System, VecStorage, World, WorldExt, Write, WriteStorage};
+use std::{collections::HashMap, path};
+
+const TILE_WIDTH: f32 = 32.0;
+const MAP_WIDTH: u8 = 8;
+const MAP_HEIGHT:u8 = 9;
+const MAP: &str = "
+    N N W W W W W W
+    W W W . . . . W
+    W . . . B . . W
+    W . . . . . . W 
+    W . P . . . . W
+    W . . . . . . W
+    W . . S . . . W
+    W . . . . . . W
+    W W W W W W W W
+"; 
 
 // 定义组件
 #[derive(Debug, Component, Clone, Copy)]
@@ -34,6 +49,22 @@ pub struct Box {}
 #[storage(VecStorage)]
 pub struct BoxSpot {}
 
+#[derive(Default)]
+pub struct InputQueue{
+    pub keys_pressed: Vec<KeyCode>,
+}
+
+// 不可移动组件
+#[derive(Component, Default)]
+#[storage(NullStorage)]
+pub struct Immovable;
+
+// 可移动组件
+#[derive(Component, Default)]
+#[storage(NullStorage)]
+pub struct Movable;
+
+
 //注册组件
 pub fn register_component(world: &mut World) {
     world.register::<Position>();
@@ -42,6 +73,13 @@ pub fn register_component(world: &mut World) {
     world.register::<Player>();
     world.register::<Box>();
     world.register::<BoxSpot>();
+    world.register::<Movable>();
+    world.register::<Immovable>();
+}
+
+// 注册资源
+pub fn register_resource(world: &mut World){
+    world.insert(InputQueue::default());
 }
 
 // 创建墙实体
@@ -51,6 +89,7 @@ pub fn create_wall(world: &mut World, position: Position){
         .with(Position{z : 10, ..position})
         .with(Renderable{path: "/images/wall.png".to_string()})
         .with(Box{})
+        .with(Immovable)
         .build();
 }
 
@@ -74,6 +113,7 @@ pub fn create_box(world: &mut World, position: Position){
             path: "/images/box.png".to_string()
         })
         .with(Box{})
+        .with(Movable)
         .build();
 }
 // 创建箱子框体斑点实体
@@ -85,10 +125,11 @@ pub fn create_box_spot(world: &mut World, position: Position){
             path: "/images/box_spot.png".to_string()
         })
         .with(BoxSpot{})
+        .with(Movable)
         .build();
 }
 // 创建玩家实体
-pub fn create_play(world: &mut World, position: Position){
+pub fn create_player(world: &mut World, position: Position){
     world
         .create_entity()
         .with(Position{z: 10, ..position})
@@ -96,21 +137,10 @@ pub fn create_play(world: &mut World, position: Position){
             path: "/images/player.png".to_string()
         })
         .with(Player{})
+        .with(Movable)
         .build();
 }
 
-const TILE_WIDTH : f32 = 32.0;
-const MAP : &str = "
-    N N W W W W W W
-    W W W . . . . W
-    W . . . B . . W
-    W . . . . . . W 
-    W . P . . . . W
-    W . . . . . . W
-    W . . S . . . W
-    W . . . . . . W
-    W W W W W W W W
-"; 
 // 渲染系统结构体
 pub struct RenderingSystem<'a> {
     context: &'a mut Context,
@@ -140,11 +170,94 @@ impl<'a> System<'a> for RenderingSystem<'a> {
     }
 }
 
+pub struct InputSystem{}
+
+impl<'a> System<'a> for InputSystem{
+    type SystemData = (
+        Write<'a, InputQueue>, 
+        Entities<'a>,
+        WriteStorage<'a, Position>, 
+        ReadStorage<'a, Player>,
+        ReadStorage<'a, Movable>,
+        ReadStorage<'a, Immovable>,
+    );
+
+    fn run(&mut self, data: Self::SystemData) {
+        let (mut input_queue, entities, 
+            mut positions, players, movables, immovables) = data;
+        
+        let mut to_move = Vec::new();
+
+        for (position, player) in (&positions, &players).join() {   
+            if let Some(key) = input_queue.keys_pressed.pop() {
+                let mov: HashMap<(u8, u8), Index> = (&entities, &movables, &positions)
+                    .join()
+                    .map(|t| ((t.2.x, t.2.y), t.0.id()))
+                    .collect::<HashMap<_, _>>();
+
+                let immov : HashMap<(u8, u8), Index> = (&entities, &immovables, &positions)
+                    .join()
+                    .map(|t| ((t.2.x, t.2.y), t.0.id()))
+                    .collect();
+
+                let (start, end, is_x) = match key {
+                    KeyCode::Up => (position.y, 0, false),
+                    KeyCode::Down => (position.y, MAP_HEIGHT, false),
+                    KeyCode::Left => (position.x, 0, true),
+                    KeyCode::Right => (position.x, MAP_WIDTH, true),
+                    _ => continue,
+                };
+
+                let range = if start < end {
+                    (start..=end).collect::<Vec<_>>()
+                } else {
+                    (end..=start).collect::<Vec<_>>()
+                };
+
+                for x_or_y in range {
+                    let pos = if is_x {
+                        (x_or_y, position.y)
+                    } else{
+                        (position.x, x_or_y)
+                    };
+
+                    match mov.get(&pos) {
+                        Some(id) => to_move.push((key, id.clone())),
+                        None => {
+                            match immov.get(&pos) { 
+                                Some(_id) => to_move.clear(),
+                                None => break,
+                            }
+                        }
+                    }
+                }
+            } 
+        }
+
+        for (key, id) in to_move {
+            let position = positions.get_mut(entities.entity(id));
+            if let Some(position) = position {
+                match key {
+                    KeyCode::Up => position.y -= 1,
+                    KeyCode::Down => position.y += 1,
+                    KeyCode::Left => position.x -= 1,
+                    KeyCode::Right => position.x += 1,
+                    _ => ()
+                }
+            }
+        }
+    }
+}
 
 struct Game{world: World}
 
 impl event::EventHandler<ggez::GameError> for Game {
     fn update(&mut self, _context: &mut Context) -> GameResult {
+        {
+            let mut is = InputSystem{};
+            is.run_now(&self.world);
+        }
+
         Ok(())
     }
 
@@ -154,8 +267,20 @@ impl event::EventHandler<ggez::GameError> for Game {
             rs.run_now(&self.world);
         }
         Ok(())
-
     }
+
+    fn key_down_event(
+            &mut self,
+            ctx: &mut Context,
+            keycode: KeyCode,
+            _keymods: KeyMods,
+            _repeat: bool,
+        ) {
+        // println!("key pressed: {:?}", keycode);
+        let mut input_queue = self.world.write_resource::<InputQueue>();
+        input_queue.keys_pressed.push(keycode);
+    }
+
 }
 
 pub fn init_level(world: &mut World) {
@@ -167,12 +292,44 @@ pub fn init_level(world: &mut World) {
 
 /// 加载地图
 pub fn load_map(world: &mut World, map_string: String) {
-    todo!()
+    let rows: Vec<&str> = map_string.trim().split("\n").map(|x| x.trim()).collect();
+    for (y, row) in rows.iter().enumerate() {
+        let columns : Vec<&str> = row.split(" ").collect();
+
+        for (x, column) in columns.iter().enumerate() {
+            let position = Position{x: x as u8, y: y as u8, z: 0};
+
+            match *column {
+                "." => create_floor(world, position),
+                "W" => {
+                    create_wall(world, position);
+                    create_floor(world, position);
+                },
+                "P" => {
+                    create_floor(world, position);
+                    create_player(world, position);
+                },
+                "B" => {
+                    create_floor(world, position);
+                    create_box(world, position);
+                }
+                "S" => {
+                    create_floor(world, position);
+                    create_box_spot(world, position);
+                },
+                "N" => (),
+                c => panic!("unrecognized map item {}",c),
+
+            }
+        }
+
+    }
 }
 
 fn main() -> GameResult{
     let mut world = World::new();
     register_component(&mut world);
+    register_resource(&mut world);
     init_level(&mut world);
 
     let context_build = ggez::ContextBuilder::new("rust_bokoban", "sokoban")
