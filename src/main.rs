@@ -100,7 +100,17 @@ pub fn create_play(world: &mut World, position: Position){
 }
 
 const TILE_WIDTH : f32 = 32.0;
-
+const MAP : &str = "
+    N N W W W W W W
+    W W W . . . . W
+    W . . . B . . W
+    W . . . . . . W 
+    W . P . . . . W
+    W . . . . . . W
+    W . . S . . . W
+    W . . . . . . W
+    W W W W W W W W
+"; 
 // 渲染系统结构体
 pub struct RenderingSystem<'a> {
     context: &'a mut Context,
@@ -149,9 +159,15 @@ impl event::EventHandler<ggez::GameError> for Game {
 }
 
 pub fn init_level(world: &mut World) {
-    create_play(world, Position{x: 0, y: 0, z: 0});
-    create_wall(world, Position{x: 1, y: 0, z: 0});
-    create_box(world, Position{x: 2, y: 0, z: 0});
+    // create_play(world, Position{x: 0, y: 0, z: 0});
+    // create_wall(world, Position{x: 1, y: 0, z: 0});
+    // create_box(world, Position{x: 2, y: 0, z: 0});
+    load_map(world, MAP.to_string())
+}
+
+/// 加载地图
+pub fn load_map(world: &mut World, map_string: String) {
+    todo!()
 }
 
 fn main() -> GameResult{
