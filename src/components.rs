@@ -1,19 +1,19 @@
-use specs::{storage::{self, GenericWriteStorage}, world::Index, Builder, Component, Entities, Join, NullStorage, ReadStorage, RunNow, System, VecStorage, World, WorldExt, Write, WriteStorage};
-
+use specs::{storage::{self, GenericWriteStorage}, world::Index, Builder, 
+Component, Entities, Join, NullStorage, ReadStorage, RunNow, System, VecStorage, World, WorldExt, Write, WriteStorage};
 
 /// 定义组件
 #[derive(Debug, Component, Clone, Copy)]
 #[storage(VecStorage)]
 pub struct Position{
-    x: u8,
-    y: u8,
-    z: u8,
+    pub x: u8,
+    pub y: u8,
+    pub z: u8,
 }
 
 #[derive(Component)]
 #[storage(VecStorage)]
 pub struct Renderable {
-    path: String,
+    pub path: String,
 }
 
 #[derive(Component)]
@@ -32,10 +32,7 @@ pub struct Box {}
 #[storage(VecStorage)]
 pub struct BoxSpot {}
 
-#[derive(Default)]
-pub struct InputQueue{
-    pub keys_pressed: Vec<KeyCode>,
-}
+
 
 // 不可移动组件
 #[derive(Component, Default)]
