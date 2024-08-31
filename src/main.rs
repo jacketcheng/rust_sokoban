@@ -23,7 +23,6 @@ const MAP: &str = "
     W W W W W W W W W
 "; 
 
-
 struct Game{world: World}
 
 impl event::EventHandler<ggez::GameError> for Game {
@@ -36,7 +35,6 @@ impl event::EventHandler<ggez::GameError> for Game {
             let mut gss = GameplayStateSystem{};
             gss.run_now(&self.world);
         }
-
         Ok(())
     }
 
@@ -68,7 +66,6 @@ pub fn init_level(world: &mut World) {
     // create_box(world, Position{x: 2, y: 0, z: 0});
     load_map(world, MAP.to_string())
 }
-
 
 fn main() -> GameResult{
     let mut world = World::new();

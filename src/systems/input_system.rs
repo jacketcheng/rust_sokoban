@@ -23,7 +23,7 @@ impl<'a> System<'a> for InputSystem{
         
         let mut to_move = Vec::new();
 
-        for (position, player) in (&positions, &players).join() {   
+        for (position, _player) in (&positions, &players).join() {   
             if let Some(key) = input_queue.keys_pressed.pop() {
                 let mov: HashMap<(u8, u8), Index> = (&entities, &movables, &positions)
                     .join()
@@ -81,7 +81,7 @@ impl<'a> System<'a> for InputSystem{
                     KeyCode::Down => position.y += 1,
                     KeyCode::Left => position.x -= 1,
                     KeyCode::Right => position.x += 1,
-                    _ => ()
+                    _ => (),
                 }
             }
         }

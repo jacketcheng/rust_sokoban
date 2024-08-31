@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::fmt::{self, Display};
 
 use ggez::event::KeyCode;
 use specs::World;
@@ -34,7 +34,7 @@ impl Default for GameplayState {
 }
 
 impl Display for GameplayState {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.write_str(match self {
             GameplayState::Playing => "Playing",
             GameplayState::Won => "Won",

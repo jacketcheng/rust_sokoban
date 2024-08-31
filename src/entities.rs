@@ -7,7 +7,7 @@ pub fn create_wall(world: &mut World, position: Position){
         .create_entity()
         .with(Position{z : 10, ..position})
         .with(Renderable{path: "/images/wall.png".to_string()})
-        .with(Box{})
+        .with(Wall{})
         .with(Immovable)
         .build();
 }
@@ -44,7 +44,6 @@ pub fn create_box_spot(world: &mut World, position: Position){
             path: "/images/box_spot.png".to_string()
         })
         .with(BoxSpot{})
-        .with(Movable)
         .build();
 }
 // 创建玩家实体
